@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/michaelzhan1/huffman-coding/internal/stream"
+	"github.com/michaelzhan1/huffman-coding/internal/compress"
 )
 
 func main() {
-	reader, err := stream.GetReader("Makefile")
+	reader, err := compress.GetReader("Makefile")
 	if err != nil {
 		panic(err)
 	}
