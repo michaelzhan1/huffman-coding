@@ -12,7 +12,7 @@ import (
 // Code represents a huffman Code. byte-by-byte reading to generate the tree means 256 unique values,
 // which means 255-bit = 32-byte max Code
 type Code struct {
-	Bits   [32]byte
+	Bits   [MaxCodeBytes]byte
 	Length int
 }
 
@@ -182,7 +182,7 @@ func (tree *CompressionTree) CodeTable() map[byte]*Code {
 		// leaf
 		if v.left == nil && v.right == nil {
 			code := &Code{
-				Bits:   [32]byte{},
+				Bits:   [MaxCodeBytes]byte{},
 				Length: len(path),
 			}
 
