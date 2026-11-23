@@ -15,4 +15,6 @@ func main() {
 	fmt.Println(tree)
 
 	fmt.Println(tree.CodeTable())
+
+	tree.Compress("test")
 }

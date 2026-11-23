@@ -9,6 +9,29 @@ import (
 	"github.com/michaelzhan1/priority-queue-go/priorityqueue"
 )
 
+// Code represents a huffman Code. byte-by-byte reading to generate the tree means 256 unique values,
+// which means 255-bit = 32-byte max Code
+type Code struct {
+	Bits   [32]byte
+	Length int
+}
+
+// String returns a string representation of the Huffman code
+func (code Code) String() string {
+	var sb strings.Builder
+
+	for i := 0; i*8 <= code.Length; i++ {
+		if i*8+8 <= code.Length {
+			fmt.Fprintf(&sb, "%08b", code.Bits[i])
+		} else {
+			rem := code.Length - i*8
+			fmt.Fprintf(&sb, "%0*b", rem, code.Bits[i]>>(8-rem))
+		}
+	}
+
+	return sb.String()
+}
+
 // node is a node in the compression tree
 type node struct {
 	value  byte
@@ -19,15 +42,9 @@ type node struct {
 
 // CompressionTree is a compression tree
 type CompressionTree struct {
-	root *node
-	freq map[byte]int
-}
-
-// Code represents a huffman Code. byte-by-byte reading to generate the tree means 256 unique values,
-// which means 255-bit = 32-byte max Code
-type Code struct {
-	Bits   [32]byte
-	Length int
+	root  *node
+	freq  map[byte]int
+	fname string
 }
 
 // NewCompressionTree returns a new compression tree
@@ -75,8 +92,9 @@ func NewCompressionTree(fname string) (*CompressionTree, error) {
 
 		if pq.IsEmpty() {
 			return &CompressionTree{
-				root: n1,
-				freq: freq,
+				root:  n1,
+				freq:  freq,
+				fname: fname,
 			}, nil
 		}
 
@@ -194,18 +212,7 @@ func (tree *CompressionTree) CodeTable() map[byte]*Code {
 	return res
 }
 
-// String returns a string representation of the Huffman code
-func (code Code) String() string {
-	var sb strings.Builder
-
-	for i := 0; i*8 <= code.Length; i++ {
-		if i*8+8 <= code.Length {
-			fmt.Fprintf(&sb, "%08b", code.Bits[i])
-		} else {
-			rem := code.Length - i*8
-			fmt.Fprintf(&sb, "%0*b", rem, code.Bits[i]>>(8-rem))
-		}
-	}
-
-	return sb.String()
+// Compress re-reads the file and compresses based on the Huffman coding
+func (tree *CompressionTree) Compress(out string) error {
+	return nil
 }
