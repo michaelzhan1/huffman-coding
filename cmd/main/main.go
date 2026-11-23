@@ -13,9 +13,7 @@ func main() {
 	}
 
 	fmt.Println(tree)
-
 	fmt.Println(tree.GetCode())
-	fmt.Println(len(tree.GetCode()))
 
 	tree.Compress("test.huff")
 }

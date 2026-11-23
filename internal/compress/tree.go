@@ -2,8 +2,10 @@ package compress
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/michaelzhan1/huffman-coding/internal/stream"
@@ -229,32 +231,125 @@ func (tree *CompressionTree) GetCode() map[byte]*Code {
 }
 
 // Compress re-reads the file and compresses based on the Huffman coding
-func (tree *CompressionTree) Compress(out string) error {
+func (tree *CompressionTree) Compress(out string) (err error) {
+	inputInfo, err := os.Stat(tree.fname)
+	if err != nil {
+		return err
+	}
+
+	outputInfo, statErr := os.Stat(out)
+	if statErr == nil {
+		if os.SameFile(inputInfo, outputInfo) {
+			return fmt.Errorf("%w: input and output refer to the same file", errInvalidOutput)
+		}
+	} else if !errors.Is(statErr, os.ErrNotExist) {
+		return statErr
+	}
+
 	writer, err := stream.GetWriter(out)
 	if err != nil {
 		return err
 	}
-	defer writer.Close()
+	defer func() {
+		if closeErr := writer.Close(); closeErr != nil {
+			err = errors.Join(err, closeErr)
+		}
+	}()
 
 	// write expected length of header (2 bytes)
-	if len(tree.freq) > 256 {
-		return fmt.Errorf("%w: unexpectedly found more than 256 alphabet characters, got %d", errCompressHeader, len(tree.freq))
+	if len(tree.code) > 256 {
+		return fmt.Errorf("%w: unexpectedly found more than 256 alphabet characters, got %d", errCompressHeader, len(tree.code))
 	}
-	binary.Write(writer, binary.BigEndian, uint16(len(tree.freq)))
+	if err := binary.Write(writer, binary.BigEndian, uint16(len(tree.code))); err != nil {
+		return err
+	}
 
-	// write alphabet ((2+code.length/8)n bytes)
+	// write size (in bits) of read (8 bytes)
+	var totalSize uint64
+	for b, code := range tree.code {
+		count, found := tree.freq[b]
+		if !found {
+			return fmt.Errorf("%w: did not find count for character %q", errCompressHeader, string(b))
+		}
+		totalSize += uint64(code.Length) * uint64(count)
+	}
+	if err := binary.Write(writer, binary.BigEndian, totalSize); err != nil {
+		return err
+	}
+
+	// write alphabet ((2+(code.length+7)/8)n bytes)
 	for b, code := range tree.code {
 		// character (1 byte)
-		binary.Write(writer, binary.BigEndian, b)
+		if err := binary.Write(writer, binary.BigEndian, b); err != nil {
+			return err
+		}
 
 		// code length (1 byte)
-		if code.Length > 255 {
-			return fmt.Errorf("%w: unexpectedly got code length longer than 255 for byte %q, got %d", errCompressHeader, string(b), code.Length)
+		if code.Length > 255 || code.Length <= 0 {
+			return fmt.Errorf("%w: unexpected code length outside of [1, 255] for byte %q, got %d", errCompressHeader, string(b), code.Length)
 		}
-		binary.Write(writer, binary.BigEndian, uint8(code.Length))
+		if err := writer.WriteByte(uint8(code.Length)); err != nil {
+			return err
+		}
 
-		// code (code.length/8 bytes)
-		binary.Write(writer, binary.BigEndian, code.Bits[:(code.Length+7)/8])
+		// code ((code.length+7)/8 bytes)
+		if _, err := writer.Write(code.Bits[:(code.Length+7)/8]); err != nil {
+			return err
+		}
+	}
+
+	// compress file contents
+	reader, err := stream.GetReader(tree.fname)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := reader.Close(); closeErr != nil {
+			err = errors.Join(err, closeErr)
+		}
+	}()
+
+	var bitsWritten uint64
+	var buf byte
+	rem := 8
+	for {
+		b, err := reader.ReadByte()
+
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		code, found := tree.code[b]
+		if !found {
+			return fmt.Errorf("%w: did not find code for %q", errCompress, string(b))
+		}
+
+		for i := range code.Length {
+			bit := (code.Bits[i/8] >> (7 - i%8)) & 1
+			buf |= bit << (rem - 1)
+			rem--
+
+			if rem == 0 {
+				rem = 8
+				if err := writer.WriteByte(buf); err != nil {
+					return err
+				}
+				buf = 0
+			}
+		}
+		bitsWritten += uint64(code.Length)
+	}
+	if rem < 8 {
+		if err := writer.WriteByte(buf); err != nil {
+			return err
+		}
+	}
+
+	if bitsWritten != totalSize {
+		return fmt.Errorf("%w: expected %d bits, wrote %d", errCompress, totalSize, bitsWritten)
 	}
 
 	if err := writer.Flush(); err != nil {

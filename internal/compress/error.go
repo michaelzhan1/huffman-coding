@@ -7,4 +7,5 @@ var (
 	errEmptyFile      = errors.New("file is empty")
 	errCompressHeader = errors.New("failed to write header to compressed file")
 	errCompress       = errors.New("failed to compress file")
+	errInvalidOutput  = errors.New("invalid output file")
 )
