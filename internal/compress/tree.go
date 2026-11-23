@@ -1,6 +1,7 @@
 package compress
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"strings"
@@ -44,6 +45,7 @@ type node struct {
 type CompressionTree struct {
 	root  *node
 	freq  map[byte]int
+	code  map[byte]*Code
 	fname string
 }
 
@@ -84,6 +86,7 @@ func NewCompressionTree(fname string) (*CompressionTree, error) {
 		})
 	}
 
+	var root *node
 	for !pq.IsEmpty() {
 		n1, ok := pq.Pop()
 		if !ok {
@@ -91,11 +94,8 @@ func NewCompressionTree(fname string) (*CompressionTree, error) {
 		}
 
 		if pq.IsEmpty() {
-			return &CompressionTree{
-				root:  n1,
-				freq:  freq,
-				fname: fname,
-			}, nil
+			root = n1
+			break
 		}
 
 		n2, ok := pq.Pop()
@@ -112,7 +112,18 @@ func NewCompressionTree(fname string) (*CompressionTree, error) {
 		pq.Push(parent)
 	}
 
-	return nil, fmt.Errorf("%w: unexpectedly exited tree building loop", errBuildTree)
+	if root == nil {
+		return nil, fmt.Errorf("%w: failed to build root for tree", errBuildTree)
+	}
+
+	tree := &CompressionTree{
+		root:  root,
+		freq:  freq,
+		fname: fname,
+	}
+
+	tree.code = tree.codeTable()
+	return tree, nil
 }
 
 // String returns the string representation of the tree
@@ -164,13 +175,8 @@ func (tree *CompressionTree) String() string {
 	return sb.String()
 }
 
-// GetFreq returns the frequency table of the compression tree
-func (tree *CompressionTree) GetFreq() map[byte]int {
-	return tree.freq
-}
-
-// CodeTable constructs and returns the Huffman code table for the compression tree
-func (tree *CompressionTree) CodeTable() map[byte]*Code {
+// codeTable constructs and returns the Huffman code table for the compression tree
+func (tree *CompressionTree) codeTable() map[byte]*Code {
 	res := map[byte]*Code{}
 
 	var visit func(*node, []bool)
@@ -212,7 +218,48 @@ func (tree *CompressionTree) CodeTable() map[byte]*Code {
 	return res
 }
 
+// GetFreq returns the frequency table of the compression tree
+func (tree *CompressionTree) GetFreq() map[byte]int {
+	return tree.freq
+}
+
+// GetCode returns the Huffman code table
+func (tree *CompressionTree) GetCode() map[byte]*Code {
+	return tree.code
+}
+
 // Compress re-reads the file and compresses based on the Huffman coding
 func (tree *CompressionTree) Compress(out string) error {
+	writer, err := stream.GetWriter(out)
+	if err != nil {
+		return err
+	}
+	defer writer.Close()
+
+	// write expected length of header (2 bytes)
+	if len(tree.freq) > 256 {
+		return fmt.Errorf("%w: unexpectedly found more than 256 alphabet characters, got %d", errCompressHeader, len(tree.freq))
+	}
+	binary.Write(writer, binary.BigEndian, uint16(len(tree.freq)))
+
+	// write alphabet ((2+code.length/8)n bytes)
+	for b, code := range tree.code {
+		// character (1 byte)
+		binary.Write(writer, binary.BigEndian, b)
+
+		// code length (1 byte)
+		if code.Length > 255 {
+			return fmt.Errorf("%w: unexpectedly got code length longer than 255 for byte %q, got %d", errCompressHeader, string(b), code.Length)
+		}
+		binary.Write(writer, binary.BigEndian, uint8(code.Length))
+
+		// code (code.length/8 bytes)
+		binary.Write(writer, binary.BigEndian, code.Bits[:(code.Length+7)/8])
+	}
+
+	if err := writer.Flush(); err != nil {
+		return err
+	}
+
 	return nil
 }

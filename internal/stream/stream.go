@@ -25,3 +25,20 @@ func GetReader(fname string) (*BufferedReadCloser, error) {
 		Closer: file,
 	}, nil
 }
+
+type BufferedWriteCloser struct {
+	*bufio.Writer
+	io.Closer
+}
+
+func GetWriter(fname string) (*BufferedWriteCloser, error) {
+	file, err := os.Create(fname)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BufferedWriteCloser{
+		Writer: bufio.NewWriter(file),
+		Closer: file,
+	}, nil
+}
