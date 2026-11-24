@@ -12,17 +12,17 @@ import (
 	"github.com/michaelzhan1/priority-queue-go/priorityqueue"
 )
 
-// node is a node in the compression tree
-type node struct {
+// compressNode is a node in the compression tree
+type compressNode struct {
 	value  byte
 	weight int
-	left   *node
-	right  *node
+	left   *compressNode
+	right  *compressNode
 }
 
 // CompressionTree is a compression tree
 type CompressionTree struct {
-	root  *node
+	root  *compressNode
 	freq  map[byte]int
 	code  map[byte]*Code
 	fname string
@@ -57,15 +57,15 @@ func NewCompressionTree(fname string) (*CompressionTree, error) {
 	}
 
 	// build tree
-	pq := priorityqueue.NewPriorityQueue(func(a, b *node) bool { return a.weight < b.weight })
+	pq := priorityqueue.NewPriorityQueue(func(a, b *compressNode) bool { return a.weight < b.weight })
 	for b, count := range freq {
-		pq.Push(&node{
+		pq.Push(&compressNode{
 			value:  b,
 			weight: count,
 		})
 	}
 
-	var root *node
+	var root *compressNode
 	for !pq.IsEmpty() {
 		n1, ok := pq.Pop()
 		if !ok {
@@ -82,7 +82,7 @@ func NewCompressionTree(fname string) (*CompressionTree, error) {
 			return nil, fmt.Errorf("%w: failed to pop from priority queue", errBuildTree)
 		}
 
-		parent := &node{
+		parent := &compressNode{
 			weight: n1.weight + n2.weight,
 			left:   n2,
 			right:  n1,
@@ -110,8 +110,8 @@ func (tree *CompressionTree) String() string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "Frequencies:\n%v\n\n", tree.freq)
 
-	var visit func(*node, []bool) string
-	visit = func(v *node, pipeDepth []bool) string {
+	var visit func(*compressNode, []bool) string
+	visit = func(v *compressNode, pipeDepth []bool) string {
 		var tab strings.Builder
 		for _, usePipe := range pipeDepth {
 			if usePipe {
@@ -158,8 +158,8 @@ func (tree *CompressionTree) String() string {
 func (tree *CompressionTree) codeTable() map[byte]*Code {
 	res := map[byte]*Code{}
 
-	var visit func(*node, []bool)
-	visit = func(v *node, path []bool) {
+	var visit func(*compressNode, []bool)
+	visit = func(v *compressNode, path []bool) {
 		if v == nil {
 			return
 		}
@@ -171,7 +171,7 @@ func (tree *CompressionTree) codeTable() map[byte]*Code {
 				Length: len(path),
 			}
 
-			idx := 0
+			idx := 0 // just use i?
 			for i, bit := range path {
 				if bit {
 					code.Bits[idx] |= 1 << (7 - i)

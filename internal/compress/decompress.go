@@ -5,17 +5,59 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/michaelzhan1/huffman-coding/internal/stream"
 	"github.com/michaelzhan1/huffman-coding/internal/util"
 )
+
+// decompressNode is a node in the huffman tree
+type decompressNode struct {
+	value byte
+	left  *decompressNode
+	right *decompressNode
+}
 
 // Decompressor contains the information needed to decompress a file
 type Decompressor struct {
 	fname     string
 	totalSize uint64
 	startByte int
-	code      map[byte]*Code
+	root      *decompressNode
+}
+
+func buildDecompressionTree(code map[byte]*Code) *decompressNode {
+	bytes := make([]byte, len(code))
+	for b := range code {
+		bytes = append(bytes, b)
+	}
+
+	// sort by increasing length
+	sort.Slice(bytes, func(i, j int) bool { return code[bytes[i]].Length < code[bytes[j]].Length })
+
+	// build tree
+	// TODO: check correctness
+	root := &decompressNode{}
+	for _, b := range bytes {
+		cur := root
+		for i := range code[b].Length {
+			if code[b].Bits[i/8]&(1<<(7-i%8)) == 1 {
+				if cur.left == nil {
+					cur.left = &decompressNode{}
+				}
+				cur = cur.left
+			} else {
+				if cur.right == nil {
+					cur.right = &decompressNode{}
+				}
+				cur = cur.right
+			}
+		}
+
+		cur.value = b
+	}
+
+	return root
 }
 
 // NewDecompressor returns a new Decompressor
@@ -73,11 +115,13 @@ func NewDecompressor(fname string) (*Decompressor, error) {
 		startByte += 2 + (length+7)/8
 	}
 
+	tree := buildDecompressionTree(code)
+
 	return &Decompressor{
 		fname:     fname,
 		totalSize: totalSize,
 		startByte: startByte,
-		code:      code,
+		root:      tree,
 	}, nil
 }
 
@@ -107,6 +151,8 @@ func (dec *Decompressor) Decompress(out string) error {
 			err = errors.Join(err, closeErr)
 		}
 	}()
+
+	// TODO: rebuild the tree in NewDecompressor
 
 	// final flush
 	if err := writer.Flush(); err != nil {
