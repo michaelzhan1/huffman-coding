@@ -5,35 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/michaelzhan1/huffman-coding/internal/stream"
+	"github.com/michaelzhan1/huffman-coding/internal/util"
 	"github.com/michaelzhan1/priority-queue-go/priorityqueue"
 )
-
-// Code represents a huffman Code. byte-by-byte reading to generate the tree means 256 unique values,
-// which means 255-bit = 32-byte max Code
-type Code struct {
-	Bits   [MaxCodeBytes]byte
-	Length int
-}
-
-// String returns a string representation of the Huffman code
-func (code Code) String() string {
-	var sb strings.Builder
-
-	for i := 0; i*8 <= code.Length; i++ {
-		if i*8+8 <= code.Length {
-			fmt.Fprintf(&sb, "%08b", code.Bits[i])
-		} else {
-			rem := code.Length - i*8
-			fmt.Fprintf(&sb, "%0*b", rem, code.Bits[i]>>(8-rem))
-		}
-	}
-
-	return sb.String()
-}
 
 // node is a node in the compression tree
 type node struct {
@@ -232,18 +209,12 @@ func (tree *CompressionTree) GetCode() map[byte]*Code {
 
 // Compress re-reads the file and compresses based on the Huffman coding
 func (tree *CompressionTree) Compress(out string) (err error) {
-	inputInfo, err := os.Stat(tree.fname)
+	sameFile, err := util.IsSameFile(tree.fname, out)
 	if err != nil {
 		return err
 	}
-
-	outputInfo, statErr := os.Stat(out)
-	if statErr == nil {
-		if os.SameFile(inputInfo, outputInfo) {
-			return fmt.Errorf("%w: input and output refer to the same file", errInvalidOutput)
-		}
-	} else if !errors.Is(statErr, os.ErrNotExist) {
-		return statErr
+	if sameFile {
+		return fmt.Errorf("%w: input and output refer to the same file", errInvalidOutput)
 	}
 
 	writer, err := stream.GetWriter(out)
@@ -256,7 +227,7 @@ func (tree *CompressionTree) Compress(out string) (err error) {
 		}
 	}()
 
-	// write expected length of header (2 bytes)
+	// write expected size of alphabet (2 bytes)
 	if len(tree.code) > 256 {
 		return fmt.Errorf("%w: unexpectedly found more than 256 alphabet characters, got %d", errCompressHeader, len(tree.code))
 	}
@@ -303,11 +274,7 @@ func (tree *CompressionTree) Compress(out string) (err error) {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if closeErr := reader.Close(); closeErr != nil {
-			err = errors.Join(err, closeErr)
-		}
-	}()
+	defer reader.Close()
 
 	var bitsWritten uint64
 	var buf byte
