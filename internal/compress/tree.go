@@ -183,3 +183,25 @@ func (tree *huffTree) getCodeMap() map[byte]*Code {
 	visit(tree.root, []bool{})
 	return res
 }
+
+// Query queries the tree and returns the byte associated with a code
+func (tree *huffTree) query(code *Code) (byte, error) {
+	if tree.root == nil {
+		return 0, errCodeNotFound
+	}
+
+	cur := tree.root
+	for i := range code.Length {
+		if (code.Bits[i/8]>>(7-i%8))&1 == 0 {
+			cur = cur.left
+		} else {
+			cur = cur.right
+		}
+
+		if cur == nil {
+			return 0, errCodeNotFound
+		}
+	}
+
+	return cur.value, nil
+}

@@ -11,4 +11,6 @@ var (
 	errCompress       = errors.New("failed to compress file")
 
 	errDecompress = errors.New("failed to decompress file")
+
+	errCodeNotFound = errors.New("code not found")
 )
