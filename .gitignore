@@ -34,4 +34,5 @@ go.work.sum
 # .vscode/
 
 hcomp
+hdecomp
 *.huff

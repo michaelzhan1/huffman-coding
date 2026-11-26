@@ -33,7 +33,6 @@ func NewDecompressor(fname string) (*Decompressor, error) {
 	if err := binary.Read(reader, binary.BigEndian, &alphabetCount); err != nil {
 		return nil, err
 	}
-	fmt.Printf("Header length: %d\n", alphabetCount)
 	startByte += 2
 
 	// read total bits written (8 bytes)
@@ -41,7 +40,6 @@ func NewDecompressor(fname string) (*Decompressor, error) {
 	if err := binary.Read(reader, binary.BigEndian, &totalBits); err != nil {
 		return nil, err
 	}
-	fmt.Printf("Total size: %d\n", totalBits)
 	startByte += 8
 
 	// read alphabet ((2+(codes.length+7)/8)n bytes)
