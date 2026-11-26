@@ -105,15 +105,15 @@ func (c *Compressor) Compress(out string) (err error) {
 	}
 
 	// write size (in bits) of read (8 bytes)
-	var totalSize uint64
+	var totalBits uint64
 	for b, code := range codes {
 		count, found := c.freq[b]
 		if !found {
 			return fmt.Errorf("%w: did not find count for character %q", errCompressHeader, string(b))
 		}
-		totalSize += uint64(code.Length) * uint64(count)
+		totalBits += uint64(code.Length) * uint64(count)
 	}
-	if err := binary.Write(writer, binary.BigEndian, totalSize); err != nil {
+	if err := binary.Write(writer, binary.BigEndian, totalBits); err != nil {
 		return err
 	}
 
@@ -184,8 +184,8 @@ func (c *Compressor) Compress(out string) (err error) {
 		}
 	}
 
-	if bitsWritten != totalSize {
-		return fmt.Errorf("%w: expected %d bits, wrote %d", errCompress, totalSize, bitsWritten)
+	if bitsWritten != totalBits {
+		return fmt.Errorf("%w: expected %d bits, wrote %d", errCompress, totalBits, bitsWritten)
 	}
 
 	if err := writer.Flush(); err != nil {

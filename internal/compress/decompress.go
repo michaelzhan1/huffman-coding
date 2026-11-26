@@ -14,7 +14,7 @@ import (
 type Decompressor struct {
 	tree      *huffTree
 	fname     string
-	totalSize uint64
+	totalBits uint64
 	startByte int
 }
 
@@ -36,12 +36,12 @@ func NewDecompressor(fname string) (*Decompressor, error) {
 	fmt.Printf("Header length: %d\n", alphabetCount)
 	startByte += 2
 
-	// read total size of content (8 bytes)
-	var totalSize uint64
-	if err := binary.Read(reader, binary.BigEndian, &totalSize); err != nil {
+	// read total bits written (8 bytes)
+	var totalBits uint64
+	if err := binary.Read(reader, binary.BigEndian, &totalBits); err != nil {
 		return nil, err
 	}
-	fmt.Printf("Total size: %d\n", totalSize)
+	fmt.Printf("Total size: %d\n", totalBits)
 	startByte += 8
 
 	// read alphabet ((2+(codes.length+7)/8)n bytes)
@@ -78,13 +78,13 @@ func NewDecompressor(fname string) (*Decompressor, error) {
 	return &Decompressor{
 		tree:      tree,
 		fname:     fname,
-		totalSize: totalSize,
+		totalBits: totalBits,
 		startByte: startByte,
 	}, nil
 }
 
-func (dec *Decompressor) Decompress(out string) error {
-	sameFile, err := util.IsSameFile(dec.fname, out)
+func (d *Decompressor) Decompress(out string) error {
+	sameFile, err := util.IsSameFile(d.fname, out)
 	if err != nil {
 		return err
 	}
@@ -93,13 +93,13 @@ func (dec *Decompressor) Decompress(out string) error {
 	}
 
 	// input reader
-	reader, err := stream.GetReader(dec.fname)
+	reader, err := stream.GetReader(d.fname)
 	if err != nil {
 		return err
 	}
 	defer reader.Close()
 
-	// output writer TODO: move output writer after any input checks
+	// output writer
 	writer, err := stream.GetWriter(out)
 	if err != nil {
 		return err
@@ -109,6 +109,44 @@ func (dec *Decompressor) Decompress(out string) error {
 			err = errors.Join(err, closeErr)
 		}
 	}()
+
+	// jump to start
+	reader.Discard(d.startByte)
+
+	// decode
+	decode := d.tree.newDecoder()
+	bitsRead := uint64(0)
+
+	var b byte
+	for bitsRead < d.totalBits {
+		if bitsRead%8 == 0 {
+			b, err = reader.ReadByte()
+
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return nil
+			}
+		}
+
+		bit := (b >> (7 - (bitsRead % 8))) & 1
+		value, found, err := decode(bit == 1)
+		if err != nil {
+			return err
+		}
+
+		if found {
+			if err := writer.WriteByte(value); err != nil {
+				return err
+			}
+		}
+		bitsRead++
+	}
+
+	if bitsRead != d.totalBits {
+		return fmt.Errorf("%w: bit read mismatch. got %d, want %d", errDecompress, bitsRead, d.totalBits)
+	}
 
 	// final flush
 	if err := writer.Flush(); err != nil {

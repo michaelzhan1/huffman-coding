@@ -172,7 +172,7 @@ func (tree *huffTree) getCodeMap() map[byte]*Code {
 			return
 		}
 
-		// traverse
+		// traverse: false/0=left, true/1=right
 		path = append(path, false)
 		visit(v.left, path)
 		path[len(path)-1] = true
@@ -184,24 +184,27 @@ func (tree *huffTree) getCodeMap() map[byte]*Code {
 	return res
 }
 
-// Query queries the tree and returns the byte associated with a code
-func (tree *huffTree) query(code *Code) (byte, error) {
-	if tree.root == nil {
-		return 0, errCodeNotFound
-	}
-
+// newDecoder returns a closure that tracks state through the tree
+func (tree *huffTree) newDecoder() func(bit bool) (byte, bool, error) {
 	cur := tree.root
-	for i := range code.Length {
-		if (code.Bits[i/8]>>(7-i%8))&1 == 0 {
-			cur = cur.left
-		} else {
+
+	return func(bit bool) (byte, bool, error) {
+		if bit {
 			cur = cur.right
+		} else {
+			cur = cur.left
 		}
 
 		if cur == nil {
-			return 0, errCodeNotFound
+			return 0, false, errCodeNotFound
 		}
-	}
 
-	return cur.value, nil
+		if cur.left == nil && cur.right == nil {
+			value := cur.value
+			cur = tree.root
+			return value, true, nil
+		}
+
+		return 0, false, nil
+	}
 }

@@ -5,18 +5,21 @@ import (
 )
 
 func main() {
-	// c, err := compress.NewCompressor("Makefile")
-	// if err != nil {
-	// 	panic(err)
-	// }
+	c, err := compress.NewCompressor("internal/compress/decompress.go")
+	if err != nil {
+		panic(err)
+	}
+	err = c.Compress("test.huff")
+	if err != nil {
+		panic(err)
+	}
 
-	// fmt.Println(c)
-	// // fmt.Println(tree.GetCode())
+	d, err := compress.NewDecompressor("test.huff")
+	if err != nil {
+		panic(err)
+	}
 
-	// fmt.Println(c.GetFreq())
-	// c.Compress("test.huff")
-
-	_, err := compress.NewDecompressor("test.huff")
+	err = d.Decompress("decomp2.go")
 	if err != nil {
 		panic(err)
 	}
