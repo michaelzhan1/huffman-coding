@@ -81,7 +81,7 @@ func NewDecompressor(fname string) (*Decompressor, error) {
 	}, nil
 }
 
-func (d *Decompressor) Decompress(out string) error {
+func (d *Decompressor) Decompress(out string) (err error) {
 	sameFile, err := util.IsSameFile(d.fname, out)
 	if err != nil {
 		return err
@@ -109,7 +109,9 @@ func (d *Decompressor) Decompress(out string) error {
 	}()
 
 	// jump to start
-	reader.Discard(d.startByte)
+	if _, err := reader.Discard(d.startByte); err != nil {
+		return err
+	}
 
 	// decode
 	decode := d.tree.newDecoder()
@@ -124,7 +126,7 @@ func (d *Decompressor) Decompress(out string) error {
 				break
 			}
 			if err != nil {
-				return nil
+				return err
 			}
 		}
 

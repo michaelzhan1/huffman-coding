@@ -16,7 +16,7 @@ type Code struct {
 func (code Code) String() string {
 	var sb strings.Builder
 
-	for i := 0; i*8 <= code.Length; i++ {
+	for i := 0; i*8 < code.Length; i++ {
 		if i*8+8 <= code.Length {
 			fmt.Fprintf(&sb, "%08b", code.Bits[i])
 		} else {

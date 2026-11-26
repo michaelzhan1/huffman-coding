@@ -9,8 +9,8 @@ import (
 
 func main() {
 	if len(os.Args) != 3 {
-		fmt.Println("usage: ./hcomp <file> <output>")
-		return
+		fmt.Fprintln(os.Stderr, "usage: ./hcomp <file> <output>")
+		os.Exit(1)
 	}
 
 	fname := os.Args[1]
@@ -18,13 +18,13 @@ func main() {
 
 	c, err := compress.NewCompressor(fname)
 	if err != nil {
-		fmt.Printf("failed to compress file: %v\n", err)
-		return
+		fmt.Fprintf(os.Stderr, "failed to compress file: %v\n", err)
+		os.Exit(1)
 	}
 
 	err = c.Compress(out)
 	if err != nil {
-		fmt.Printf("failed to compress file: %v\n", err)
-		return
+		fmt.Fprintf(os.Stderr, "failed to compress file: %v\n", err)
+		os.Exit(1)
 	}
 }

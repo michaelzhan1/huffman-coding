@@ -16,7 +16,7 @@ import (
 type Compressor struct {
 	tree  *huffTree
 	fname string
-	freq  map[byte]int // TODO: use uint64
+	freq  map[byte]uint64
 }
 
 // NewCompressor returns a new Compressor
@@ -28,7 +28,7 @@ func NewCompressor(fname string) (*Compressor, error) {
 	defer reader.Close()
 
 	// build frequency map
-	freq := map[byte]int{}
+	freq := map[byte]uint64{}
 	for {
 		b, err := reader.ReadByte()
 
@@ -61,7 +61,7 @@ func NewCompressor(fname string) (*Compressor, error) {
 }
 
 // GetFreq returns the frequency map of the file
-func (c *Compressor) GetFreq() map[byte]int {
+func (c *Compressor) GetFreq() map[byte]uint64 {
 	return maps.Clone(c.freq)
 }
 

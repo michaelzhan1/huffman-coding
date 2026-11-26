@@ -35,7 +35,7 @@ func (v *node) String() string {
 		}
 
 		var value string
-		if v.value > 0 { // TODO: better handle byte 0
+		if v.left == nil && v.right == nil {
 			value = string(v.value)
 		}
 
@@ -62,19 +62,28 @@ type huffTree struct {
 }
 
 // treeFromFreq returns a *huffTree from a frequency map
-func treeFromFreq(freq map[byte]int) (*huffTree, error) {
-	// TODO: add tie breaking on the priority queue ordering
+func treeFromFreq(freq map[byte]uint64) (*huffTree, error) {
+	tb := 0 // tiebreaker
+
 	type item struct {
-		weight int
+		tb     int
+		weight uint64
 		node   *node
 	}
 
-	pq := priorityqueue.NewPriorityQueue(func(a, b *item) bool { return a.weight < b.weight })
+	pq := priorityqueue.NewPriorityQueue(func(a, b *item) bool {
+		if a.weight == b.weight {
+			return a.tb < b.tb
+		}
+		return a.weight < b.weight
+	})
 	for b, count := range freq {
 		pq.Push(&item{
+			tb:     tb,
 			weight: count,
 			node:   &node{value: b},
 		})
+		tb++
 	}
 
 	var root *node
@@ -95,12 +104,14 @@ func treeFromFreq(freq map[byte]int) (*huffTree, error) {
 		}
 
 		parent := &item{
+			tb:     tb,
 			weight: n1.weight + n2.weight,
 			node: &node{
 				left:  n2.node,
 				right: n1.node,
 			},
 		}
+		tb++
 
 		pq.Push(parent)
 	}
@@ -109,10 +120,8 @@ func treeFromFreq(freq map[byte]int) (*huffTree, error) {
 }
 
 // treeFromCode returns a *huffTree from a huffman code
-// TODO: add validation for malformed codes
 func treeFromCode(codes map[byte]*Code) *huffTree {
 	// build tree
-	// TODO: check correctness
 	root := &node{}
 	for b, code := range codes {
 		cur := root
@@ -158,13 +167,9 @@ func (tree *huffTree) getCodeMap() map[byte]*Code {
 				Length: len(path), // TODO: will fail for a single char file
 			}
 
-			idx := 0 // TODO: just use i?
 			for i, bit := range path {
 				if bit {
-					code.Bits[idx] |= 1 << (7 - i%8)
-				}
-				if (i+1)%8 == 0 {
-					idx++
+					code.Bits[i/8] |= 1 << (7 - i%8)
 				}
 			}
 

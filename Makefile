@@ -8,11 +8,11 @@ DECOMP_BIN := hdecomp
 all: $(COMP_BIN) $(DECOMP_BIN)
 
 $(COMP_BIN): $(SRC) go.mod
-	$(GO) build -o $@ cmd/compress/main.go
+	$(GO) build -o $@ ./cmd/compress
 
 $(DECOMP_BIN): $(SRC) go.mod
-	$(GO) build -o $@ cmd/decompress/main.go
+	$(GO) build -o $@ ./cmd/decompress
 
 .PHONY: clean
 clean:
-	rm hcomp
+	rm -f $(COMP_BIN) $(DECOMP_BIN)
