@@ -116,6 +116,13 @@ func treeFromFreq(freq map[byte]uint64) (*huffTree, error) {
 		pq.Push(parent)
 	}
 
+	// check for single case
+	if root.left == nil && root.right == nil {
+		root = &node{
+			left: root,
+		}
+	}
+
 	return &huffTree{root: root}, nil
 }
 
@@ -164,7 +171,7 @@ func (tree *huffTree) getCodeMap() map[byte]*Code {
 		if v.left == nil && v.right == nil {
 			code := &Code{
 				Bits:   [MaxCodeBytes]byte{},
-				Length: len(path), // TODO: will fail for a single char file
+				Length: len(path),
 			}
 
 			for i, bit := range path {
